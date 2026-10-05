@@ -3,6 +3,8 @@ Tests del servidor MCP de Payg0.
 
 No llaman a la red: el API de Payg0 se simula con httpx.MockTransport.
 """
+import json
+
 import httpx
 import pytest
 from mcp import Client
@@ -103,33 +105,82 @@ async def test_none_params_are_not_sent(payg0_api):
 
 # ─── Herramientas MCP ─────────────────────────────────────────────────────────
 
-async def test_phase1_exposes_only_read_only_tools():
-    """Guarda de regresión: la Fase 1 no puede exponer herramientas que muevan dinero."""
+READ_ONLY_TOOLS = {"get_balance", "get_history", "get_transaction", "lookup_user", "validate_payment"}
+WRITE_TOOLS = {"cancel_payment"}
+
+
+async def test_every_tool_is_classified():
+    """
+    Guarda de regresión: cada herramienta debe estar clasificada aquí a
+    propósito. Una herramienta nueva hace fallar este test hasta que alguien
+    decida, de forma explícita, si puede modificar algo.
+    """
     async with Client(mcp) as c:
-        tools = (await c.list_tools()).tools
+        tools = {t.name: t for t in (await c.list_tools()).tools}
 
-    assert {t.name for t in tools} == {"get_balance", "get_history", "get_transaction", "lookup_user"}
-    for tool in tools:
-        assert tool.annotations.read_only_hint is True, tool.name
-        assert tool.annotations.destructive_hint is False, tool.name
+    assert set(tools) == READ_ONLY_TOOLS | WRITE_TOOLS
+    for name in READ_ONLY_TOOLS:
+        assert tools[name].annotations.read_only_hint is True, name
+        assert tools[name].annotations.destructive_hint is False, name
+    for name in WRITE_TOOLS:
+        assert tools[name].annotations.read_only_hint is False, name
+        assert tools[name].annotations.destructive_hint is True, name
 
 
+@pytest.mark.parametrize("tool", ["get_transaction", "cancel_payment"])
 @pytest.mark.parametrize("bad_id", [
     "../../admin/api/users",
     "../wallet/balance",
     "not-a-uuid",
     "",
 ])
-async def test_transaction_id_cannot_alter_the_path(payg0_api, monkeypatch, bad_id):
+async def test_transaction_id_cannot_alter_the_path(payg0_api, monkeypatch, tool, bad_id):
     """Un ID malicioso se rechaza antes de llegar a Payg0."""
     calls, _ = payg0_api
     monkeypatch.setenv("PAYG0_API_KEY", VALID_KEY)
 
     async with Client(mcp) as c:
-        result = await c.call_tool("get_transaction", {"transaction_id": bad_id})
+        result = await c.call_tool(tool, {"transaction_id": bad_id})
 
     assert result.is_error
     assert calls == []
+
+
+async def test_validate_payment_sends_amount_as_exact_string(payg0_api, monkeypatch):
+    """El monto viaja como string para no perder precisión con floats."""
+    calls, responses = payg0_api
+    responses["/api/v1/payments/validate"] = httpx.Response(200, json={"valid": True})
+    monkeypatch.setenv("PAYG0_API_KEY", VALID_KEY)
+
+    async with Client(mcp) as c:
+        result = await c.call_tool("validate_payment", {"recipient": "@carlos", "amount": "150.50"})
+
+    assert not result.is_error
+    assert calls[0].method == "POST"
+    assert json.loads(calls[0].content) == {"recipient": "@carlos", "amount": "150.50"}
+
+
+@pytest.mark.parametrize("amount", ["0", "-10", "10.555", "abc"])
+async def test_invalid_amounts_never_reach_payg0(payg0_api, monkeypatch, amount):
+    calls, _ = payg0_api
+    monkeypatch.setenv("PAYG0_API_KEY", VALID_KEY)
+
+    async with Client(mcp) as c:
+        result = await c.call_tool("validate_payment", {"recipient": "@carlos", "amount": amount})
+
+    assert result.is_error
+    assert calls == []
+
+
+async def test_limit_errors_show_payg0_message(payg0_api):
+    """Los errores de límites de Payg0 llegan como objeto; se muestra su mensaje."""
+    _, responses = payg0_api
+    responses["/api/v1/payments/send"] = httpx.Response(
+        422, json={"detail": {"error_code": "LIMIT_SINGLE_TX", "message": "Excede tu límite por operación."}},
+    )
+
+    with pytest.raises(ToolError, match="Excede tu límite por operación"):
+        await client.request("POST", "/payments/send", VALID_KEY, json={})
 
 
 async def test_get_history_rejects_out_of_range_limit(payg0_api, monkeypatch):

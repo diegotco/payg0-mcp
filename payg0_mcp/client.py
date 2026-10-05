@@ -75,7 +75,12 @@ def _error_message(response: httpx.Response) -> str:
         return "Demasiadas solicitudes. Espera un minuto antes de intentar de nuevo."
     if status >= 500:
         return "Payg0 no está disponible en este momento. Intenta más tarde."
-    return detail if isinstance(detail, str) else f"Error de Payg0 (HTTP {status})."
+    if isinstance(detail, str):
+        return detail
+    # Los errores de límites llegan como objeto: {"error_code": ..., "message": ...}
+    if isinstance(detail, dict) and isinstance(detail.get("message"), str):
+        return detail["message"]
+    return f"Error de Payg0 (HTTP {status})."
 
 
 async def request(

@@ -1,13 +1,14 @@
 """
-Servidor MCP de Payg0 — Fase 1 (solo lectura).
+Servidor MCP de Payg0.
 
 Expone el saldo, historial y transacciones del usuario a agentes de IA.
-Ninguna herramienta de esta fase puede mover dinero.
+Ninguna herramienta puede enviar dinero fuera de la billetera del usuario.
 """
 from __future__ import annotations
 
 import os
 import uuid
+from decimal import Decimal
 from typing import Annotated, Any, Literal
 
 from mcp.server.mcpserver import Context, MCPServer
@@ -24,9 +25,10 @@ INSTRUCTIONS = """\
 Payg0 es una plataforma de pagos P2P en pesos mexicanos (MXN). En esta fase el
 dinero es simulado.
 
-Estas herramientas son de SOLO LECTURA: puedes consultar el saldo, el historial y
-el detalle de transacciones, y verificar si un destinatario existe. Ninguna puede
-enviar ni cancelar pagos.
+Puedes consultar el saldo, el historial y el detalle de transacciones, verificar
+si un destinatario existe y validar si un pago sería aprobado. También puedes
+cancelar un pago PENDING del usuario (los fondos regresan a su saldo); confirma
+con el usuario antes de hacerlo. Ninguna herramienta puede enviar dinero.
 
 Al reportar saldos, usa `available_balance` como el dinero que el usuario puede
 enviar; `held_balance` está reservado por pagos pendientes.
@@ -75,18 +77,24 @@ async def get_history(
     )
 
 
+def _parse_transaction_id(transaction_id: str) -> uuid.UUID:
+    """
+    El ID va dentro de la URL: lo validamos como UUID para que nunca pueda
+    alterar la ruta (p. ej. '../') y llegar a otros endpoints de Payg0.
+    """
+    try:
+        return uuid.UUID(transaction_id)
+    except ValueError:
+        raise ToolError("El ID de transacción no es un UUID válido.") from None
+
+
 @mcp.tool(title="Detalle de transacción", annotations=READ_ONLY)
 async def get_transaction(
     ctx: Context,
     transaction_id: Annotated[str, Field(description="ID (UUID) de la transacción.")],
 ) -> dict[str, Any]:
     """Devuelve el detalle de una transacción: monto, estado, contraparte y fechas."""
-    # El ID va dentro de la URL: lo validamos como UUID para que nunca pueda
-    # alterar la ruta (p. ej. '../') y llegar a otros endpoints de Payg0.
-    try:
-        tx_id = uuid.UUID(transaction_id)
-    except ValueError:
-        raise ToolError("El ID de transacción no es un UUID válido.") from None
+    tx_id = _parse_transaction_id(transaction_id)
     key = client.resolve_api_key(ctx.headers)
     return await client.request("GET", f"/payments/{tx_id}", key)
 
@@ -102,6 +110,56 @@ async def lookup_user(
     """Verifica si un destinatario existe en Payg0 antes de enviarle dinero."""
     key = client.resolve_api_key(ctx.headers)
     return await client.request("GET", "/users/lookup", key, params={"q": query})
+
+
+Amount = Annotated[
+    Decimal,
+    Field(gt=0, max_digits=12, decimal_places=2, description="Monto en MXN, máximo 2 decimales."),
+]
+Recipient = Annotated[
+    str,
+    Field(min_length=1, max_length=255, description="Nickname (@carlos) o email del destinatario."),
+]
+
+
+@mcp.tool(title="Validar pago", annotations=READ_ONLY)
+async def validate_payment(
+    ctx: Context,
+    recipient: Recipient,
+    amount: Amount,
+) -> dict[str, Any]:
+    """
+    Comprueba si un pago sería aprobado SIN ejecutarlo: saldo disponible y
+    límites del usuario. No mueve dinero. Úsalo antes de proponer un envío.
+    """
+    key = client.resolve_api_key(ctx.headers)
+    return await client.request(
+        "POST", "/payments/validate", key,
+        json={"recipient": recipient, "amount": str(amount)},
+    )
+
+
+@mcp.tool(
+    title="Cancelar pago pendiente",
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=True,
+        idempotent_hint=True,
+        open_world_hint=True,
+    ),
+)
+async def cancel_payment(
+    ctx: Context,
+    transaction_id: Annotated[str, Field(description="ID (UUID) del pago PENDING a cancelar.")],
+) -> dict[str, Any]:
+    """
+    Cancela un pago PENDING que el usuario envió (a alguien que aún no se ha
+    registrado). Los fondos regresan al saldo disponible del usuario.
+    Confirma con el usuario antes de cancelar.
+    """
+    tx_id = _parse_transaction_id(transaction_id)
+    key = client.resolve_api_key(ctx.headers)
+    return await client.request("POST", f"/payments/{tx_id}/cancel", key)
 
 
 @mcp.custom_route("/health", methods=["GET"])
