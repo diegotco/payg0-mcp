@@ -1,0 +1,17 @@
+# Secretos — nunca subir API keys al repo
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+
+# Sistema
+.DS_Store
