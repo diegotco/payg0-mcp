@@ -1,7 +1,7 @@
 [project]
 name = "payg0-mcp"
 version = "0.1.0"
-description = "Servidor MCP de Payg0: conecta tu billetera de Payg0 a agentes de IA."
+description = "Payg0 MCP server: connect your Payg0 wallet to AI agents."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
