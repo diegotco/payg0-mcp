@@ -1,9 +1,9 @@
 """
-Cliente HTTP delgado hacia el API público de Payg0.
+Thin HTTP client for the public Payg0 API.
 
-Este servidor MCP no tiene base de datos ni lógica de negocio propia: cada
-herramienta reenvía la API key del usuario al API de Payg0, que es la única
-autoridad que la valida. El servidor nunca almacena ni registra la key.
+This MCP server has no database and no business logic of its own: every tool
+forwards the user's API key to the Payg0 API, which is the only authority
+that validates it. The server never stores or logs the key.
 """
 from __future__ import annotations
 
@@ -15,9 +15,9 @@ from typing import Any
 import httpx
 from mcp.server.mcpserver.exceptions import ToolError
 
-# httpx registra en INFO la URL completa de cada request, incluidos los query
-# params (p. ej. el email buscado en lookup_user). No queremos datos de
-# usuarios en los logs del servidor.
+# At INFO level httpx logs the full URL of every request, including query
+# params (e.g. the email searched in lookup_user). User data must stay out of
+# the server logs.
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
 API_URL = os.environ.get("PAYG0_API_URL", "https://api.payg0.io").rstrip("/") + "/api/v1"
@@ -27,16 +27,16 @@ KEY_PREFIX = "pyg0_"
 
 def resolve_api_key(headers: Mapping[str, str] | None) -> str:
     """
-    Obtiene la API key del usuario.
+    Returns the user's API key.
 
-    - Transporte HTTP: del header `X-API-Key` o `Authorization: Bearer <key>`.
-    - Transporte stdio: de la variable de entorno `PAYG0_API_KEY`.
+    - HTTP transport: from the `X-API-Key` or `Authorization: Bearer <key>` header.
+    - stdio transport: from the `PAYG0_API_KEY` environment variable.
 
-    Solo comprueba el formato. La validez real la decide el API de Payg0.
+    Only the format is checked. Whether the key is valid is decided by the Payg0 API.
     """
     key = ""
     if headers is not None:
-        # Los headers HTTP no distinguen mayúsculas; normalizamos.
+        # HTTP header names are case-insensitive; normalize them.
         lowered = {k.lower(): v for k, v in headers.items()}
         key = lowered.get("x-api-key", "")
         if not key:
@@ -49,18 +49,16 @@ def resolve_api_key(headers: Mapping[str, str] | None) -> str:
     key = key.strip()
     if not key:
         raise ToolError(
-            "Falta la API key de Payg0. Configúrala en tu cliente MCP con el header "
-            "'X-API-Key'. Puedes crear una en payg0.io → Perfil → API & Dev."
+            "Missing Payg0 API key. Set it in your MCP client with the 'X-API-Key' header. "
+            "You can create one at payg0.io → \"Mi perfil\" → \"API & Dev\"."
         )
     if not key.startswith(KEY_PREFIX):
-        raise ToolError(
-            f"La API key no tiene el formato esperado (debe empezar con '{KEY_PREFIX}')."
-        )
+        raise ToolError(f"The API key has an unexpected format (it must start with '{KEY_PREFIX}').")
     return key
 
 
 def _error_message(response: httpx.Response) -> str:
-    """Traduce errores del API a mensajes claros para el agente."""
+    """Turns API errors into clear messages for the agent."""
     try:
         detail = response.json().get("detail")
     except Exception:
@@ -68,19 +66,19 @@ def _error_message(response: httpx.Response) -> str:
 
     status = response.status_code
     if status == 401:
-        return "La API key es inválida o fue revocada. Genera una nueva en payg0.io."
+        return "The API key is invalid or has been revoked. Create a new one at payg0.io."
     if status == 404:
-        return detail or "No se encontró el recurso solicitado."
+        return detail or "The requested resource was not found."
     if status == 429:
-        return "Demasiadas solicitudes. Espera un minuto antes de intentar de nuevo."
+        return "Too many requests. Wait a minute before trying again."
     if status >= 500:
-        return "Payg0 no está disponible en este momento. Intenta más tarde."
+        return "Payg0 is unavailable right now. Try again later."
     if isinstance(detail, str):
         return detail
-    # Los errores de límites llegan como objeto: {"error_code": ..., "message": ...}
+    # Limit errors arrive as an object: {"error_code": ..., "message": ...}
     if isinstance(detail, dict) and isinstance(detail.get("message"), str):
         return detail["message"]
-    return f"Error de Payg0 (HTTP {status})."
+    return f"Payg0 error (HTTP {status})."
 
 
 async def request(
@@ -91,7 +89,7 @@ async def request(
     params: dict[str, Any] | None = None,
     json: dict[str, Any] | None = None,
 ) -> Any:
-    """Llama al API de Payg0 y devuelve el JSON, o levanta ToolError."""
+    """Calls the Payg0 API and returns the JSON body, or raises ToolError."""
     clean_params = {k: v for k, v in (params or {}).items() if v is not None}
     try:
         async with httpx.AsyncClient(timeout=TIMEOUT) as client:
@@ -102,12 +100,12 @@ async def request(
                 params=clean_params,
                 json=json,
             )
-    # `from None` evita encadenar la excepción de httpx, que lleva adjunto el
-    # request con el header X-API-Key y podría terminar en logs.
+    # `from None` avoids chaining the httpx exception, which carries the
+    # request (including the X-API-Key header) and could end up in logs.
     except httpx.TimeoutException:
-        raise ToolError("Payg0 tardó demasiado en responder. Intenta de nuevo.") from None
+        raise ToolError("Payg0 took too long to respond. Try again.") from None
     except httpx.HTTPError:
-        raise ToolError("No se pudo conectar con Payg0. Intenta más tarde.") from None
+        raise ToolError("Could not connect to Payg0. Try again later.") from None
 
     if response.is_error:
         raise ToolError(_error_message(response))

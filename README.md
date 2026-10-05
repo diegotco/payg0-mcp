@@ -1,52 +1,53 @@
 # Payg0 MCP
 
-Servidor [MCP](https://modelcontextprotocol.io) que conecta tu billetera de
-[Payg0](https://api.payg0.io) con agentes de IA. Tu agente puede consultar tu
-saldo e historial, y preparar pagos que **tú confirmas con tu NIP en payg0.io**.
+[MCP](https://modelcontextprotocol.io) server that connects your
+[Payg0](https://api.payg0.io) wallet to AI agents. Your agent can check your
+balance and history, and prepare payments that **you confirm with your PIN on
+payg0.io**.
 
-## Cómo se envía un pago
+## How a payment is sent
 
-1. Le pides a tu agente: *"Mándale 250 pesos a @carlos por la cena"*.
-2. El agente llama `send_payment`. **No se mueve dinero:** Payg0 crea una
-   solicitud y le devuelve un enlace.
-3. Abres el enlace. Payg0 (no el agente) te muestra el monto y el destinatario,
-   y confirmas escribiendo tu NIP.
-4. El agente consulta `check_payment_status` y te confirma que se envió.
+1. You ask your agent: *"Send 250 pesos to @carlos for dinner"*.
+2. The agent calls `send_payment`. **No money moves:** Payg0 creates a request
+   and returns a link to the agent.
+3. You open the link. Payg0 (not the agent) shows you the amount and the
+   recipient, and you confirm by entering your PIN.
+4. The agent calls `check_payment_status` and tells you the payment went through.
 
-El enlace expira en 10 minutos y cada solicitud se ejecuta como máximo una vez.
+The link expires in 10 minutes, and each request executes at most once.
 
-## Seguridad
+## Security
 
-- **Tu NIP nunca pasa por el agente.** Solo se escribe en payg0.io, siguiendo
-  la [especificación de MCP](https://modelcontextprotocol.io/specification/2025-11-25/client/elicitation)
-  para credenciales que autorizan transacciones. Ninguna herramienta acepta un
-  NIP como parámetro. Si un agente te pide tu NIP en el chat, no se lo des.
-- **El agente no puede aprobar pagos por su cuenta**, aunque sea manipulado:
-  sin tu NIP en payg0.io, no se mueve dinero.
-- **El servidor no guarda nada.** No tiene base de datos. Cada request trae tu
-  API key, que se reenvía al API de Payg0 y se descarta. Payg0 es la única
-  autoridad que la valida.
-- **Tu API key nunca se registra** en los logs del servidor, ni viaja en la URL.
-- **Usa una API key dedicada para tu agente**, creada en payg0.io → Perfil →
-  API & Dev. Si dejas de usarla, revócala.
-- Cada key tiene sus propios límites de uso (rate limiting).
+- **Your PIN never passes through the agent.** It is only entered on payg0.io,
+  following the [MCP specification](https://modelcontextprotocol.io/specification/2025-11-25/client/elicitation)
+  for credentials that authorize transactions. No tool accepts a PIN as a
+  parameter. If an agent asks for your PIN in the chat, don't give it.
+- **The agent cannot approve payments on its own**, even if it is manipulated:
+  without your PIN on payg0.io, no money moves.
+- **The server stores nothing.** It has no database. Every request carries your
+  API key, which is forwarded to the Payg0 API and discarded. Payg0 is the only
+  authority that validates it.
+- **Your API key is never logged** by the server, and it never travels in the URL.
+- **Use a dedicated API key for your agent**, created at payg0.io → "Mi perfil" →
+  "API & Dev". Revoke it when you stop using it.
+- Each key has its own rate limits.
 
-## Herramientas
+## Tools
 
-| Herramienta | Qué hace | Modifica algo |
+| Tool | What it does | Modifies anything |
 |---|---|---|
-| `get_balance` | Saldo total, en escrow y disponible para enviar (MXN) | No |
-| `get_history` | Pagos enviados y recibidos, con filtro por estado | No |
-| `get_transaction` | Detalle de una transacción por su ID | No |
-| `lookup_user` | Verifica si un destinatario existe (por nickname o email) | No |
-| `validate_payment` | Comprueba saldo y límites de un pago, sin ejecutarlo | No |
-| `send_payment` | Prepara un pago y devuelve el enlace para confirmarlo con tu NIP | Crea una solicitud; no mueve dinero |
-| `check_payment_status` | Indica si confirmaste, rechazaste o dejaste expirar un pago | No |
-| `cancel_payment` | Cancela un pago pendiente que enviaste; el dinero regresa a tu saldo | Sí |
+| `get_balance` | Total balance, amount held in escrow, and amount available to send (MXN) | No |
+| `get_history` | Sent and received payments, filterable by status | No |
+| `get_transaction` | Details of a transaction by ID | No |
+| `lookup_user` | Checks whether a recipient exists (by nickname or email) | No |
+| `validate_payment` | Checks balance and limits for a payment without executing it | No |
+| `send_payment` | Prepares a payment and returns the link to confirm it with your PIN | Creates a request; moves no money |
+| `check_payment_status` | Tells whether you confirmed, declined, or let a payment expire | No |
+| `cancel_payment` | Cancels a pending payment you sent; the money returns to your balance | Yes |
 
-## Conectar desde tu cliente MCP
+## Connect from your MCP client
 
-Configura el servidor remoto con tu API key en el header `X-API-Key`:
+Configure the remote server with your API key in the `X-API-Key` header:
 
 ```json
 {
@@ -54,38 +55,38 @@ Configura el servidor remoto con tu API key en el header `X-API-Key`:
     "payg0": {
       "url": "https://mcp.payg0.io/mcp",
       "headers": {
-        "X-API-Key": "pyg0_live_tu_key_aqui"
+        "X-API-Key": "pyg0_live_your_key_here"
       }
     }
   }
 }
 ```
 
-También se acepta `Authorization: Bearer <key>`.
+`Authorization: Bearer <key>` is also accepted.
 
-## Desarrollo local
+## Local development
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 
-# Tests (no llaman a la red)
+# Tests (no network access)
 pytest
 
-# Servidor HTTP en http://localhost:8000/mcp
+# HTTP server at http://localhost:8000/mcp
 python -m payg0_mcp.server
 
-# O en modo stdio, con la key en una variable de entorno
+# Or in stdio mode, with the key in an environment variable
 MCP_TRANSPORT=stdio PAYG0_API_KEY=pyg0_test_... python -m payg0_mcp.server
 ```
 
-## Configuración
+## Configuration
 
-| Variable | Por defecto | Descripción |
+| Variable | Default | Description |
 |---|---|---|
-| `MCP_TRANSPORT` | `streamable-http` | `streamable-http` o `stdio` |
-| `PORT` | `8000` | Puerto HTTP |
-| `PAYG0_API_KEY` | — | Solo en modo `stdio` |
-| `PAYG0_API_URL` | `https://api.payg0.io` | URL del API de Payg0 |
-| `MCP_ALLOWED_HOSTS` | — | Hosts permitidos en producción (p. ej. `mcp.payg0.io`) |
+| `MCP_TRANSPORT` | `streamable-http` | `streamable-http` or `stdio` |
+| `PORT` | `8000` | HTTP port |
+| `PAYG0_API_KEY` | — | Only in `stdio` mode |
+| `PAYG0_API_URL` | `https://api.payg0.io` | Payg0 API URL |
+| `MCP_ALLOWED_HOSTS` | — | Allowed hosts in production (e.g. `mcp.payg0.io`) |
