@@ -2,7 +2,8 @@
 Servidor MCP de Payg0.
 
 Expone el saldo, historial y transacciones del usuario a agentes de IA.
-Ninguna herramienta puede enviar dinero fuera de la billetera del usuario.
+Los pagos solo se ejecutan cuando el usuario los confirma con su NIP en
+payg0.io; el NIP nunca pasa por el agente ni por este servidor.
 """
 from __future__ import annotations
 
@@ -28,7 +29,12 @@ dinero es simulado.
 Puedes consultar el saldo, el historial y el detalle de transacciones, verificar
 si un destinatario existe y validar si un pago sería aprobado. También puedes
 cancelar un pago PENDING del usuario (los fondos regresan a su saldo); confirma
-con el usuario antes de hacerlo. Ninguna herramienta puede enviar dinero.
+con el usuario antes de hacerlo.
+
+Para enviar dinero usa send_payment: no mueve dinero, sino que devuelve un
+enlace donde el usuario confirma el pago con su NIP en payg0.io. Muéstrale el
+enlace y luego usa check_payment_status para saber si lo confirmó.
+NUNCA pidas el NIP del usuario en el chat: solo se escribe en payg0.io.
 
 Al reportar saldos, usa `available_balance` como el dinero que el usuario puede
 enviar; `held_balance` está reservado por pagos pendientes.
@@ -160,6 +166,59 @@ async def cancel_payment(
     tx_id = _parse_transaction_id(transaction_id)
     key = client.resolve_api_key(ctx.headers)
     return await client.request("POST", f"/payments/{tx_id}/cancel", key)
+
+
+@mcp.tool(
+    title="Enviar pago (requiere confirmación)",
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        # Esta herramienta no mueve dinero: solo crea una solicitud que el
+        # usuario confirma con su NIP en payg0.io.
+        destructive_hint=False,
+        idempotent_hint=False,
+        open_world_hint=True,
+    ),
+)
+async def send_payment(
+    ctx: Context,
+    recipient: Recipient,
+    amount: Amount,
+    description: Annotated[str | None, Field(max_length=500, description="Concepto del pago (opcional).")] = None,
+) -> dict[str, Any]:
+    """
+    Prepara un pago que el usuario debe confirmar con su NIP en payg0.io.
+    NO mueve dinero: devuelve un enlace (`confirm_url`) que debes mostrarle al
+    usuario. El enlace expira en 10 minutos. Nunca pidas el NIP en el chat.
+    Después usa check_payment_status para saber si lo confirmó.
+    """
+    key = client.resolve_api_key(ctx.headers)
+    body: dict[str, Any] = {"recipient": recipient, "amount": str(amount)}
+    if description:
+        body["description"] = description
+    intent = await client.request("POST", "/payments/intents", key, json=body)
+    intent["next_step"] = (
+        "Muestra confirm_url al usuario y pídele que lo abra para confirmar con su NIP. "
+        "No se ha movido dinero."
+    )
+    return intent
+
+
+@mcp.tool(title="Estado de un pago por confirmar", annotations=READ_ONLY)
+async def check_payment_status(
+    ctx: Context,
+    payment_id: Annotated[str, Field(description="`id` devuelto por send_payment.")],
+) -> dict[str, Any]:
+    """
+    Indica si el usuario ya confirmó un pago creado con send_payment.
+    Estados: AWAITING_CONFIRMATION, CONFIRMED (incluye transaction_id),
+    DECLINED, EXPIRED o FAILED (incluye failure_reason).
+    """
+    try:
+        intent_id = uuid.UUID(payment_id)
+    except ValueError:
+        raise ToolError("El ID del pago no es un UUID válido.") from None
+    key = client.resolve_api_key(ctx.headers)
+    return await client.request("GET", f"/payments/intents/{intent_id}", key)
 
 
 @mcp.custom_route("/health", methods=["GET"])

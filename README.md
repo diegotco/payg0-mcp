@@ -2,32 +2,47 @@
 
 Servidor [MCP](https://modelcontextprotocol.io) que conecta tu billetera de
 [Payg0](https://api.payg0.io) con agentes de IA. Tu agente puede consultar tu
-saldo, tu historial de pagos y el detalle de tus transacciones.
+saldo e historial, y preparar pagos que **tú confirmas con tu NIP en payg0.io**.
 
-> **Fase 1 — solo lectura.** Ninguna herramienta de esta versión puede enviar,
-> cancelar ni mover dinero.
+## Cómo se envía un pago
+
+1. Le pides a tu agente: *"Mándale 250 pesos a @carlos por la cena"*.
+2. El agente llama `send_payment`. **No se mueve dinero:** Payg0 crea una
+   solicitud y le devuelve un enlace.
+3. Abres el enlace. Payg0 (no el agente) te muestra el monto y el destinatario,
+   y confirmas escribiendo tu NIP.
+4. El agente consulta `check_payment_status` y te confirma que se envió.
+
+El enlace expira en 10 minutos y cada solicitud se ejecuta como máximo una vez.
 
 ## Seguridad
 
+- **Tu NIP nunca pasa por el agente.** Solo se escribe en payg0.io, siguiendo
+  la [especificación de MCP](https://modelcontextprotocol.io/specification/2025-11-25/client/elicitation)
+  para credenciales que autorizan transacciones. Ninguna herramienta acepta un
+  NIP como parámetro. Si un agente te pide tu NIP en el chat, no se lo des.
+- **El agente no puede aprobar pagos por su cuenta**, aunque sea manipulado:
+  sin tu NIP en payg0.io, no se mueve dinero.
 - **El servidor no guarda nada.** No tiene base de datos. Cada request trae tu
   API key, que se reenvía al API de Payg0 y se descarta. Payg0 es la única
   autoridad que la valida.
 - **Tu API key nunca se registra** en los logs del servidor, ni viaja en la URL.
-- **Usa una API key dedicada para tu agente.** Créala en payg0.io → Perfil →
-  API & Dev, y déjala **sin** el permiso de pagos. Así, aunque el agente fuera
-  manipulado, no podría mover dinero. Si dejas de usarla, revócala.
+- **Usa una API key dedicada para tu agente**, creada en payg0.io → Perfil →
+  API & Dev. Si dejas de usarla, revócala.
 - Cada key tiene sus propios límites de uso (rate limiting).
 
 ## Herramientas
 
-| Herramienta | Qué hace |
-|---|---|
-| `get_balance` | Saldo total, en escrow y disponible para enviar (MXN) |
-| `get_history` | Pagos enviados y recibidos, con filtro por estado |
-| `get_transaction` | Detalle de una transacción por su ID |
-| `lookup_user` | Verifica si un destinatario existe (por nickname o email) |
-
-Todas están marcadas como `readOnlyHint: true` y `destructiveHint: false`.
+| Herramienta | Qué hace | Modifica algo |
+|---|---|---|
+| `get_balance` | Saldo total, en escrow y disponible para enviar (MXN) | No |
+| `get_history` | Pagos enviados y recibidos, con filtro por estado | No |
+| `get_transaction` | Detalle de una transacción por su ID | No |
+| `lookup_user` | Verifica si un destinatario existe (por nickname o email) | No |
+| `validate_payment` | Comprueba saldo y límites de un pago, sin ejecutarlo | No |
+| `send_payment` | Prepara un pago y devuelve el enlace para confirmarlo con tu NIP | Crea una solicitud; no mueve dinero |
+| `check_payment_status` | Indica si confirmaste, rechazaste o dejaste expirar un pago | No |
+| `cancel_payment` | Cancela un pago pendiente que enviaste; el dinero regresa a tu saldo | Sí |
 
 ## Conectar desde tu cliente MCP
 

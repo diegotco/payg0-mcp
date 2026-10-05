@@ -105,8 +105,18 @@ async def test_none_params_are_not_sent(payg0_api):
 
 # ─── Herramientas MCP ─────────────────────────────────────────────────────────
 
-READ_ONLY_TOOLS = {"get_balance", "get_history", "get_transaction", "lookup_user", "validate_payment"}
-WRITE_TOOLS = {"cancel_payment"}
+# (read_only_hint, destructive_hint) esperados para cada herramienta.
+EXPECTED_ANNOTATIONS = {
+    "get_balance": (True, False),
+    "get_history": (True, False),
+    "get_transaction": (True, False),
+    "lookup_user": (True, False),
+    "validate_payment": (True, False),
+    "check_payment_status": (True, False),
+    "cancel_payment": (False, True),
+    # Escribe (crea una solicitud) pero no mueve dinero: el usuario confirma con su NIP.
+    "send_payment": (False, False),
+}
 
 
 async def test_every_tool_is_classified():
@@ -118,32 +128,70 @@ async def test_every_tool_is_classified():
     async with Client(mcp) as c:
         tools = {t.name: t for t in (await c.list_tools()).tools}
 
-    assert set(tools) == READ_ONLY_TOOLS | WRITE_TOOLS
-    for name in READ_ONLY_TOOLS:
-        assert tools[name].annotations.read_only_hint is True, name
-        assert tools[name].annotations.destructive_hint is False, name
-    for name in WRITE_TOOLS:
-        assert tools[name].annotations.read_only_hint is False, name
-        assert tools[name].annotations.destructive_hint is True, name
+    assert set(tools) == set(EXPECTED_ANNOTATIONS)
+    for name, (read_only, destructive) in EXPECTED_ANNOTATIONS.items():
+        assert tools[name].annotations.read_only_hint is read_only, name
+        assert tools[name].annotations.destructive_hint is destructive, name
 
 
-@pytest.mark.parametrize("tool", ["get_transaction", "cancel_payment"])
+async def test_no_tool_accepts_a_pin():
+    """
+    El NIP solo se escribe en payg0.io. Ninguna herramienta puede recibirlo:
+    si pasara por el agente quedaría en el historial del chat y podría
+    reutilizarse para autorizar otros pagos.
+    """
+    async with Client(mcp) as c:
+        tools = (await c.list_tools()).tools
+
+    for tool in tools:
+        params = {p.lower() for p in tool.input_schema.get("properties", {})}
+        assert not params & {"pin", "nip", "password", "contraseña"}, tool.name
+
+
+@pytest.mark.parametrize("tool,param", [
+    ("get_transaction", "transaction_id"),
+    ("cancel_payment", "transaction_id"),
+    ("check_payment_status", "payment_id"),
+])
 @pytest.mark.parametrize("bad_id", [
     "../../admin/api/users",
     "../wallet/balance",
     "not-a-uuid",
     "",
 ])
-async def test_transaction_id_cannot_alter_the_path(payg0_api, monkeypatch, tool, bad_id):
+async def test_ids_cannot_alter_the_path(payg0_api, monkeypatch, tool, param, bad_id):
     """Un ID malicioso se rechaza antes de llegar a Payg0."""
     calls, _ = payg0_api
     monkeypatch.setenv("PAYG0_API_KEY", VALID_KEY)
 
     async with Client(mcp) as c:
-        result = await c.call_tool(tool, {"transaction_id": bad_id})
+        result = await c.call_tool(tool, {param: bad_id})
 
     assert result.is_error
     assert calls == []
+
+
+async def test_send_payment_only_creates_a_confirmation_request(payg0_api, monkeypatch):
+    """send_payment nunca llama a /payments/send: solo crea la solicitud por confirmar."""
+    calls, responses = payg0_api
+    responses["/api/v1/payments/intents"] = httpx.Response(201, json={
+        "id": "3f1c1b9e-0000-4000-8000-000000000000",
+        "status": "AWAITING_CONFIRMATION",
+        "confirm_url": "https://api.payg0.io/confirm-payment/3f1c1b9e-0000-4000-8000-000000000000",
+    })
+    monkeypatch.setenv("PAYG0_API_KEY", VALID_KEY)
+
+    async with Client(mcp) as c:
+        result = await c.call_tool(
+            "send_payment", {"recipient": "@carlos", "amount": "250.00", "description": "Cena"},
+        )
+
+    assert not result.is_error
+    assert [call.url.path for call in calls] == ["/api/v1/payments/intents"]
+    assert json.loads(calls[0].content) == {"recipient": "@carlos", "amount": "250.00", "description": "Cena"}
+    data = result.structured_content
+    assert data["confirm_url"].endswith("/confirm-payment/3f1c1b9e-0000-4000-8000-000000000000")
+    assert "No se ha movido dinero" in data["next_step"]
 
 
 async def test_validate_payment_sends_amount_as_exact_string(payg0_api, monkeypatch):
