@@ -50,7 +50,7 @@ def resolve_api_key(headers: Mapping[str, str] | None) -> str:
     if not key:
         raise ToolError(
             "Missing Payg0 API key. Set it in your MCP client with the 'X-API-Key' header. "
-            "You can create one at payg0.io → \"Mi perfil\" → \"API & Dev\"."
+            "You can create one at payg0.io → \"My profile\" (\"Mi perfil\" in Spanish) → \"API & Dev\"."
         )
     if not key.startswith(KEY_PREFIX):
         raise ToolError(f"The API key has an unexpected format (it must start with '{KEY_PREFIX}').")
