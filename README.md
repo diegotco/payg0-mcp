@@ -28,8 +28,8 @@ The link expires in 10 minutes, and each request executes at most once.
   API key, which is forwarded to the Payg0 API and discarded. Payg0 is the only
   authority that validates it.
 - **Your API key is never logged** by the server, and it never travels in the URL.
-- **Use a dedicated API key for your agent**, created at payg0.io → "Mi perfil" →
-  "API & Dev". Revoke it when you stop using it.
+- **Use a dedicated API key for your agent**, created at payg0.io → "My profile"
+  ("Mi perfil" in Spanish) → "API & Dev". Revoke it when you stop using it.
 - Each key has its own rate limits.
 
 ## Tools
