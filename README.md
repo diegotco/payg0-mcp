@@ -90,3 +90,7 @@ MCP_TRANSPORT=stdio PAYG0_API_KEY=pyg0_test_... python -m payg0_mcp.server
 | `PAYG0_API_KEY` | — | Only in `stdio` mode |
 | `PAYG0_API_URL` | `https://api.payg0.io` | Payg0 API URL |
 | `MCP_ALLOWED_HOSTS` | — | Allowed hosts in production (e.g. `mcp.payg0.io`) |
+
+## License
+
+[MIT](LICENSE) © 2026 Diego Leon Ullauri. This license covers the code of this MCP server; using it requires a Payg0 account and API key, subject to the terms of [payg0.io](https://payg0.io).
