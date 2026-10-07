@@ -31,6 +31,7 @@ The link expires in 10 minutes, and each request executes at most once.
 - **Use a dedicated API key for your agent**, created at payg0.io → "My profile"
   ("Mi perfil" in Spanish) → "API & Dev". Revoke it when you stop using it.
 - Each key has its own rate limits.
+- Found a vulnerability? Report it privately: see [SECURITY.md](SECURITY.md).
 
 ## Tools
 
