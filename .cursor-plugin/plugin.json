@@ -1,0 +1,27 @@
+{
+  "name": "payg0",
+  "displayName": "Payg0",
+  "version": "0.1.0",
+  "description": "Connect your Payg0 wallet (Mexican pesos, MXN) to your agent: check your balance and payment history, look up recipients, and prepare payments that you confirm with your PIN on payg0.io. Your PIN never passes through the agent. In the current phase the money on Payg0 is simulated.",
+  "author": {
+    "name": "Payg0",
+    "email": "support@payg0.io"
+  },
+  "homepage": "https://payg0.io/developers/agents",
+  "repository": "https://github.com/diegotco/payg0-mcp",
+  "license": "MIT",
+  "keywords": ["payments", "wallet", "mxn", "mexico", "p2p", "mcp"],
+  "logo": "assets/logo.svg",
+  "mcpServers": "./mcp.json",
+  "variables": {
+    "type": "object",
+    "properties": {
+      "PAYG0_API_KEY": {
+        "type": "string",
+        "title": "Payg0 API key",
+        "description": "Starts with pyg0_. Create a dedicated key for your agent at payg0.io → My profile (Mi perfil) → API & Dev, and revoke it when you stop using it."
+      }
+    },
+    "required": ["PAYG0_API_KEY"]
+  }
+}
