@@ -6,7 +6,7 @@
 discussions.** Report them privately through either channel:
 
 - **GitHub:** [report a vulnerability](https://github.com/diegotco/payg0-mcp/security/advisories/new)
-  (Security tab → "Report a vulnerability").
+  ("Security and quality" tab → "Report a vulnerability").
 - **Email:** support@payg0.io, with "Security" in the subject.
 
 Please include:

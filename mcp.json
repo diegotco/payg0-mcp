@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "payg0": {
+      "url": "https://mcp.payg0.io/mcp",
+      "headers": {
+        "X-API-Key": "${PAYG0_API_KEY}"
+      }
+    }
+  }
+}

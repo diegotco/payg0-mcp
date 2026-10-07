@@ -65,6 +65,14 @@ Configure the remote server with your API key in the `X-API-Key` header:
 
 `Authorization: Bearer <key>` is also accepted.
 
+### Cursor
+
+This repository is also a [Cursor plugin](https://cursor.com/docs/plugins):
+[`.cursor-plugin/plugin.json`](.cursor-plugin/plugin.json) and
+[`mcp.json`](mcp.json). After installing it, set `PAYG0_API_KEY` under
+**Plugins → Configure**; Cursor sends it in the `X-API-Key` header. No key is
+stored in this repository.
+
 ## Local development
 
 ```bash
