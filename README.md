@@ -67,11 +67,14 @@ Configure the remote server with your API key in the `X-API-Key` header:
 
 ### Cursor
 
-This repository is also a [Cursor plugin](https://cursor.com/docs/plugins):
+Install it from **[cursor.directory/plugins/payg0](https://cursor.directory/plugins/payg0)**
+("Add to Cursor"). Then give Cursor your key: set `PAYG0_API_KEY` under
+**Plugins → Configure**, or, if the server's config shows `${PAYG0_API_KEY}`
+in the `X-API-Key` header, replace it with your key.
+
+This repository is the [Cursor plugin](https://cursor.com/docs/plugins):
 [`.cursor-plugin/plugin.json`](.cursor-plugin/plugin.json) and
-[`mcp.json`](mcp.json). After installing it, set `PAYG0_API_KEY` under
-**Plugins → Configure**; Cursor sends it in the `X-API-Key` header. No key is
-stored in this repository.
+[`mcp.json`](mcp.json). No key is stored in it.
 
 ## Local development
 
