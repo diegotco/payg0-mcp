@@ -2,7 +2,7 @@
   "name": "payg0",
   "displayName": "Payg0",
   "version": "0.1.0",
-  "description": "Connect your Payg0 wallet (Mexican pesos, MXN) to your agent: check your balance and payment history, look up recipients, and prepare payments that you confirm with your PIN on payg0.io. Your PIN never passes through the agent. In the current phase the money on Payg0 is simulated.",
+  "description": "Connect your Payg0 wallet (Mexican pesos, MXN) to your agent: check your balance and payment history, look up recipients, and prepare payments that you confirm with your PIN on payg0.io. Your PIN never passes through the agent. In the current phase, the money on Payg0 is simulated.",
   "author": {
     "name": "Payg0",
     "email": "support@payg0.io"
@@ -11,7 +11,7 @@
   "repository": "https://github.com/diegotco/payg0-mcp",
   "license": "MIT",
   "keywords": ["payments", "wallet", "mxn", "mexico", "p2p", "mcp"],
-  "logo": "assets/logo.svg",
+  "logo": "assets/logo.png",
   "mcpServers": "./mcp.json",
   "variables": {
     "type": "object",
