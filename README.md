@@ -103,6 +103,34 @@ MCP_TRANSPORT=stdio PAYG0_API_KEY=pyg0_test_... python -m payg0_mcp.server
 | `PAYG0_API_URL` | `https://api.payg0.io` | Payg0 API URL |
 | `MCP_ALLOWED_HOSTS` | — | Allowed hosts in production (e.g. `mcp.payg0.io`) |
 
+## Deploying on Railway
+
+Railway builds this service with Railpack. Railway stops reading Config as
+Code files (`railway.toml`) on 2026-12-01, so the service leaves it one change
+per deploy:
+
+| Step | What changes | Health check |
+|---|---|---|
+| C1 | A `Procfile` with the same start command (`web: python -m payg0_mcp.server`); while `railway.toml` exists it still decides, so nothing changes | From the file |
+| C3 | `railway.toml` is deleted. The start command now comes from the `Procfile` (Railpack reads it); the builder stays Railpack | **None for this deploy** |
+| C4 | The owner sets the dashboard values below; no code change | Back, from the dashboard |
+
+**Dashboard values after C3** (mcp → Settings). The docs do not list the field
+labels; these are the ones the dashboard showed in 2026-11, so match by section
+if one differs:
+
+| Section | Field | Value |
+|---|---|---|
+| Build | Builder | Leave **Railpack** |
+| Deploy | Custom Start Command | **Empty**, so the `Procfile` runs. If it shows a value, it must be exactly `python -m payg0_mcp.server` |
+| Deploy | Healthcheck Path | `/health` |
+| Deploy | Healthcheck Timeout | `60` (seconds; Railway's default is 300) |
+| Deploy | Restart Policy | **On Failure**, max retries **5** (as `railway.toml` had) |
+| Config-as-code | Railway Config File | Leave empty (it shows **+ Add File Path**) |
+
+After each step: the deploy succeeds and `https://mcp.payg0.io/health` answers
+200; after C4 the build log's healthcheck block shows `Path: /health`.
+
 ## License
 
 [MIT](LICENSE) © 2026 Diego Leon Ullauri. This license covers the code of this MCP server; using it requires a Payg0 account and API key, subject to the terms of [payg0.io](https://payg0.io).
