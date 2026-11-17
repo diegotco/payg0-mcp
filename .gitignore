@@ -15,3 +15,10 @@ dist/
 
 # Sistema
 .DS_Store
+
+# Database backups and key files: customer data and secrets never go in git
+# (this repository is public).
+*.dump.cms
+*.dump
+*.pem
+*.key
