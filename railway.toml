@@ -1,8 +1,10 @@
+# Step C3a (README, "Deploying on Railway"): no start command here, so the
+# Procfile starts the service while this file's health check still guards the
+# deploy. Step C3b deletes this file.
 [build]
 builder = "RAILPACK"
 
 [deploy]
-startCommand = "python -m payg0_mcp.server"
 healthcheckPath = "/health"
 healthcheckTimeout = 60
 restartPolicyType = "ON_FAILURE"
