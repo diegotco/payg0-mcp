@@ -112,10 +112,11 @@ per deploy:
 | Step | What changes | Health check |
 |---|---|---|
 | C1 | A `Procfile` with the same start command (`web: python -m payg0_mcp.server`); while `railway.toml` exists it still decides, so nothing changes | From the file |
-| C3 | `railway.toml` is deleted. The start command now comes from the `Procfile` (Railpack reads it); the builder stays Railpack | **None for this deploy** |
+| C3a | `railway.toml` loses only its start command, so the `Procfile` starts the service (Railpack reads it); builder, health check and restart policy stay in the file | From the file: a failed start leaves the previous deploy serving |
+| C3b | `railway.toml` is deleted; the builder stays Railpack | **None for this deploy** |
 | C4 | The owner sets the dashboard values below; no code change | Back, from the dashboard |
 
-**Dashboard values after C3** (mcp → Settings). The docs do not list the field
+**Dashboard values after C3b** (mcp → Settings). The docs do not list the field
 labels; these are the ones the dashboard showed in 2026-11, so match by section
 if one differs:
 
