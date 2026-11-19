@@ -1,0 +1,3 @@
+# Direct dependencies, loose. requirements.txt pins what production runs.
+mcp>=2.3,<3
+httpx>=0.27

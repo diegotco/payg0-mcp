@@ -105,8 +105,14 @@ MCP_TRANSPORT=stdio PAYG0_API_KEY=pyg0_test_... python -m payg0_mcp.server
 
 ## Deploying on Railway
 
-Railway builds this service with Railpack. Railway stops reading Config as
-Code files (`railway.toml`) on 2026-12-01, so the service leaves it one change
+Railway builds this service with Railpack, which runs
+`pip install -r requirements.txt`. That file pins every package, indirect ones
+included, to the versions production runs, so a deploy never upgrades
+anything on its own. The loose direct dependencies are in `requirements.in`
+(and in `pyproject.toml` for `pip install payg0-mcp`). To upgrade: change the
+pin, run the tests in a fresh venv built from `requirements.txt`, then deploy.
+
+Railway stops reading Config as Code files (`railway.toml`) on 2026-12-01, so the service leaves it one change
 per deploy:
 
 | Step | What changes | Health check |
